@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and usage / 使用讨论
+    url: https://github.com/Maxwell00000086/laya-agent-kit/discussions
+    about: Ask installation questions and discuss ideas with the community.
+  - name: Private security report / 私密安全报告
+    url: https://github.com/Maxwell00000086/laya-agent-kit/security/advisories/new
+    about: Report vulnerabilities without publishing exploit details.

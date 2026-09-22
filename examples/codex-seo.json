@@ -1,0 +1,18 @@
+{
+  "operation": "rank_passages",
+  "input": {
+    "goal": "How canonical URLs affect duplicate product pages in search indexing",
+    "passages": [
+      {
+        "id": "canonical-note",
+        "source": "synthetic:seo-canonical-example",
+        "text": "A canonical URL identifies the preferred URL among duplicate or very similar pages. Product filtering can create multiple URLs for similar content. Canonical annotations and internal links should consistently identify the intended URL."
+      },
+      {
+        "id": "unrelated-note",
+        "source": "synthetic:cooking-example",
+        "text": "To make a simple soup, chop the carrots and simmer them in water until soft. Season to taste and serve warm."
+      }
+    ]
+  }
+}

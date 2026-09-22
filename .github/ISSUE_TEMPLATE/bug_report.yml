@@ -1,0 +1,27 @@
+name: Bug report / 问题反馈
+description: Report a reproducible installation or integration problem.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include secrets or full client configuration files. Report vulnerabilities privately through the Security tab.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 运行环境
+      description: Operating system, architecture, Python version, client and repository revision.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      description: Include the command you ran and the expected and actual behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted error output / 脱敏错误信息
+      description: Remove API keys, tokens, private paths and personal data before posting.
+      render: text

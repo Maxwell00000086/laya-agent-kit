@@ -1,0 +1,18 @@
+name: Feature request / 功能建议
+description: Suggest a concrete improvement to Laya Agent Kit.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case / 需求场景
+      description: What are you trying to do, and what is missing today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 期望行为
+      description: Describe the workflow, target clients and any alternatives you considered.
+    validations:
+      required: true

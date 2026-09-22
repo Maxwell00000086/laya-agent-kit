@@ -1,0 +1,35 @@
+name: Agent Kit
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-kit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Agent Kit (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install regression test dependencies
+        run: python -m pip install "mcp==1.30.0" "tomlkit>=0.13.3,<1" "huggingface_hub>=0.20,<2"
+      - name: Installer and ChatGPT setup regressions
+        run: |
+          python -m unittest discover -s tests -p test_agent_kit.py -v
+          python -m unittest discover -s tests -p test_chatgpt_setup.py -v
+      - name: Compile integration modules
+        run: python -m compileall -q agent-kit/src install.py start_chatgpt.py

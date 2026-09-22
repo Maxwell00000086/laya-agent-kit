@@ -1,0 +1,11 @@
+interface:
+  display_name: "Laya Local Decisions"
+  short_description: "Local SEO passage ranking and bounded frontend judgments"
+  default_prompt: "Use $laya to rank the supplied SEO passages or compare frontend options, then verify the evidence and summarize the findings."
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "laya"
+      description: "Local offline passage ranking and typed judgments"

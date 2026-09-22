@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "laya-agent-kit"
+version = "0.1.0"
+description = "Install local Laya decision tools in Codex, Claude Code and MCP clients"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "laya==0.3.5",
+    "mcp==1.30.0",
+    "tomlkit>=0.13.3,<1",
+    "torch>=2.0,<3",
+    "transformers>=4.48,<6",
+    "huggingface_hub>=0.20,<2",
+]
+
+[project.scripts]
+laya-agent-kit = "laya_agent_kit.cli:main"
+laya-mcp = "laya_agent_kit.server:serve"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+laya_agent_kit = ["skill/SKILL.md", "skill/agents/openai.yaml"]

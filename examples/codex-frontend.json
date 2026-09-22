@@ -1,0 +1,18 @@
+{
+  "operation": "judge",
+  "input": {
+    "state": "Observed HTML: <input id=\"business-email\" type=\"email\" placeholder=\"Email\">. The accessibility tree reports this input has an empty accessible name. The task is to fix the missing accessible label while preserving email validation.",
+    "questions": {
+      "next_step": {
+        "type": "choice",
+        "instructions": "Which candidate directly fixes the observed accessibility issue?",
+        "criteria": {
+          "add_label": "Add a visible label associated with the input ID",
+          "change_color": "Change the background color",
+          "remove_validation": "Remove the email input type",
+          "needs_review": "Insufficient evidence to select a fix"
+        }
+      }
+    }
+  }
+}
