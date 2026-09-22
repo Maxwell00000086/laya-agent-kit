@@ -32,5 +32,7 @@ jobs:
           python -m unittest discover -s tests -p test_agent_kit.py -v
           python -m unittest discover -s tests -p test_chatgpt_setup.py -v
           python tests/test_runtime_lifecycle.py
+          python tests/test_backends.py
+          python tests/test_provision.py
       - name: Compile integration modules
         run: python -m compileall -q agent-kit/src install.py start_chatgpt.py

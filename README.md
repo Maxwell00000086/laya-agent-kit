@@ -6,6 +6,8 @@ Community integration for local **Laya + Codex / Claude Code / Cursor / ChatGPT*
 
 **Local coding agents:** `python install.py --client codex --client claude-code` — [中文安装说明](AGENT-KIT.md) · [English guide](agent-kit/README.md).
 
+**Updates / 更新记录:** [CHANGELOG.md](CHANGELOG.md) · [Hardware support / 硬件支持](agent-kit/HARDWARE.md).
+
 ```sh
 git clone https://github.com/Maxwell00000086/laya-agent-kit.git laya
 cd laya

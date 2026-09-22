@@ -5,19 +5,20 @@ import json
 import sys
 
 from .clients import server_spec
+from .backends import select_device
 from .models import missing_model_files
 
 
-def runtime_info():
+def runtime_info(device="auto"):
     with redirect_stdout(sys.stderr):
-        import torch
-
-        cuda = torch.cuda.is_available()
+        selection = select_device(device)
         return {
             "python": sys.version.split()[0],
             "packages": {name: version(name) for name in ("laya", "laya-agent-kit", "mcp", "torch", "transformers")},
-            "cuda_available": cuda,
-            "gpu": torch.cuda.get_device_name(0) if cuda else None,
+            "cuda_available": selection["cuda_available"],
+            "gpu": selection["gpu"],
+            "runtime": selection,
+            "inference_verified": False,
         }
 
 
@@ -63,15 +64,19 @@ async def probe(directory, device="auto", inference_model=None, registration=Non
 def diagnose(directory, device="auto", models=(), inference_model=None):
     import anyio
 
-    info = runtime_info()
+    info = runtime_info(device)
     missing = missing_model_files(directory)
     info["missing_model_files"] = missing
-    if device == "cuda" and not info["cuda_available"]:
-        raise RuntimeError("CUDA was requested but is unavailable. Install a compatible PyTorch CUDA build/driver or select --device cpu.")
     incomplete = [name for name in models if missing[name]]
     if incomplete:
         raise RuntimeError(f"Missing models: {', '.join(incomplete)}. Run download first.")
     info["mcp"] = anyio.run(probe, directory, device, inference_model)
+    if inference_model:
+        from .backends import execution_report
+
+        inference = info["mcp"]["inference"]
+        info["runtime"] = execution_report(info["runtime"], inference["device"], inference.get("runtime", {}).get("fallback_reason"))
+        info["inference_verified"] = True
     info["ok"] = True
     return info
 

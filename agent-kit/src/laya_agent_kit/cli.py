@@ -4,6 +4,7 @@ from pathlib import Path
 import sys
 
 from . import __version__
+from .backends import DEVICE_CHOICES
 from .clients import CLIENTS, apply_changes, config_path, parse_config, plan_install, plan_uninstall, render_config, server_spec
 from .models import MODEL_NAMES, data_directory, prepare_models
 
@@ -12,11 +13,11 @@ def make_parser():
     parser = argparse.ArgumentParser(description="Local Laya integration for Codex, Claude Code, Cursor and MCP clients")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="operation", required=True)
-    for operation in ("install", "uninstall", "download", "doctor", "config", "prepare"):
+    for operation in ("install", "uninstall", "download", "doctor", "config", "prepare", "hardware"):
         command = commands.add_parser(operation)
         command.add_argument("--data-dir", type=Path, help="Model cache and installation records; also accepted via LAYA_HOME")
         if operation != "uninstall":
-            command.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+            command.add_argument("--device", choices=DEVICE_CHOICES, default="auto")
         if operation in ("install", "download", "doctor", "prepare"):
             command.add_argument("--models", nargs="+", choices=MODEL_NAMES, default=list(MODEL_NAMES))
         if operation in ("install", "download", "prepare"):
@@ -41,6 +42,10 @@ def make_parser():
 
 def run(arguments):
     directory = data_directory(arguments.data_dir)
+    if arguments.operation == "hardware":
+        from .diagnostics import runtime_info
+
+        return runtime_info(arguments.device)
     if arguments.operation == "config":
         key = "mcp_servers" if arguments.client == "codex" else "mcpServers"
         print(render_config(arguments.client, {key: {"laya": server_spec(arguments.client, directory, arguments.device)}}).decode(), end="")

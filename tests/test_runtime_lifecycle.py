@@ -58,6 +58,7 @@ class RuntimeLifecycleTests(unittest.TestCase):
     def setUp(self):
         self.runtime = LocalRuntime()
         self.runtime.router = SingleCheckpointMemory()
+        self.runtime.selection = {"requested_device": "auto", "selected_backend": "cpu", "fallback_reason": None}
         self.missing = {"english": [], "multilingual": [], "typed-decisions": []}
         self.patches = ExitStack()
         self.addCleanup(self.patches.close)

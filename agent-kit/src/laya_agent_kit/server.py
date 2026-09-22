@@ -17,6 +17,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from . import __version__
+from .backends import execution_report, select_device
 from .models import MODEL_REVISION, data_directory, missing_model_files, model_directories
 
 
@@ -130,6 +131,8 @@ def check_budget(tokenizer, config, state, questions):
 class LocalRuntime:
     def __init__(self):
         self.router = None
+        self.selection = None
+        self.last_execution = None
         self.lock = threading.RLock()
 
     def get_router(self):
@@ -138,11 +141,10 @@ class LocalRuntime:
                 from laya import Router
 
                 device = os.environ.get("LAYA_DEVICE", "auto")
-                if device not in ("auto", "cpu", "cuda"):
-                    raise ValueError("LAYA_DEVICE must be auto, cpu or cuda")
+                self.selection = select_device(device)
                 self.router = Router(
                     models={name: str(directory) for name, directory in MODEL_DIRECTORIES.items()},
-                    device=None if device == "auto" else device,
+                    device=self.selection["selected_device"],
                     max_loaded=1,
                 )
         return self.router
@@ -158,6 +160,9 @@ class LocalRuntime:
                 "cached_models": {name: not missing for name, missing in missing_model_files(DATA_DIRECTORY).items()},
                 "data_directory": str(DATA_DIRECTORY),
                 "loaded_models": self.router.loaded if self.router else [],
+                "runtime": self.last_execution or self.selection or {"requested_device": os.environ.get("LAYA_DEVICE", "auto"), "actual_device": None, "actual_backend": None},
+                "inference_verified": self.last_execution is not None,
+                "unimplemented_backends": ["directml", "onnx"],
                 "context_tokens": {"english": 512, "multilingual": 1024, "typed-decisions": 1024},
                 "limits": {"questions": 8, "options_per_question": 8, "passages": 16},
                 "capabilities": ["typed judgments over supplied text", "passage relevance ranking"],
@@ -181,8 +186,10 @@ class LocalRuntime:
                 if torch.cuda.is_initialized():
                     torch.cuda.empty_cache()
             agent = router.load(decision["model"])
+            self.describe_execution(agent)
             budgets = check_budget(agent.tok, agent.cfg, request.state, questions)
             result = agent.predict(request.state, questions)
+            execution = self.describe_execution(agent)
             answers = {}
             for identifier, answer in result["answers"].items():
                 answers[identifier] = {key: value for key, value in answer.items() if key != "action"}
@@ -190,6 +197,7 @@ class LocalRuntime:
                 numbers.extend(answer[key] for key in ("score", "noul") if key in answer)
                 if not all(math.isfinite(number) for number in numbers):
                     raise RuntimeError("Model returned a non-finite result; no decision is available")
+            self.last_execution = execution
             return {
                 "engine": "local_laya",
                 "advisory": True,
@@ -197,12 +205,20 @@ class LocalRuntime:
                 "model": decision["model"],
                 "model_revision": MODEL_REVISION,
                 "device": str(agent.device),
+                "runtime": execution,
                 "routing_reason": decision["reason"],
                 "answers": answers,
                 "input_budget": budgets,
                 "usage": result["usage"],
                 "elapsed_ms": round((time.perf_counter() - started) * 1000, 1),
             }
+
+    def describe_execution(self, agent):
+        previous_reason = self.last_execution.get("fallback_reason") if self.last_execution else None
+        execution = execution_report(self.selection, agent.device, getattr(agent, "fallback_reason", None) or previous_reason)
+        if execution["actual_backend"] == "cpu" and self.selection["requested_device"] == "auto":
+            self.router.device = "cpu"
+        return execution
 
     def rank(self, request):
         questions = {
@@ -228,6 +244,7 @@ class LocalRuntime:
                 "probabilities": answer["probabilities"],
                 "model": result["model"],
                 "device": result["device"],
+                "runtime": result["runtime"],
                 "input_budget": result["input_budget"]["relevance"],
             })
         ranked.sort(key=lambda passage: passage["score"], reverse=True)

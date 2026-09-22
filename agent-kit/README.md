@@ -46,7 +46,8 @@ On Windows replace `.venv/bin/python` with `.\.venv\Scripts\python.exe`.
 - `--user-home PATH` redirects client configuration/skills for isolated validation. `--data-dir` selects the model cache and installation records.
 - `--offline` requires cached models and Python dependencies. Bootstrap offline provisioning accepts `--wheelhouse PATH`; its wheels must match the target platform/Python. It needs setuptools and wheel as well as runtime dependencies.
 - `--models english multilingual` downloads/checks only those models. Requests routed to an absent model fail explicitly with `MODEL_NOT_INSTALLED`.
-- `--device auto` uses Laya's GPU detection with CPU fallback. Select `cpu` or `cuda` explicitly; unavailable requested CUDA fails before registration. `install.py --torch-index-url https://download.pytorch.org/whl/cu130 ...` can select official PyTorch CUDA wheels when compatible with the machine. Existing compatible PyTorch installations are reused otherwise.
+- `--device auto` reuses available CUDA/HIP or MPS, with a reported CPU fallback. Explicit `cpu`, `cuda`, `rocm` and `mps` selections are supported; a requested GPU cannot pass inference verification by silently using CPU. Fresh AMD/unknown Windows or Linux systems use CPU wheels unless a supported ROCm build is already configured or explicitly selected. See [hardware setup and validation limits](HARDWARE.md).
+- `python -m laya_agent_kit hardware --device auto` reports the available backend without loading weights. `doctor --inference` and judgment results report the actual backend and fallback reason. ROCm uses the `cuda` API but is identified separately as `rocm`. DirectML and ONNX are not implemented.
 - `doctor --client codex` checks the client's registration. Alternative launchers, including the older `codex_bridge.py`, are verified through MCP for the kit version and data directory. `doctor --inference` executes one synthetic judgment; this is not an accuracy benchmark.
 - Uninstall restores any replaced Laya registration/skill and retains unrelated later edits. It refuses to overwrite edits to the managed Laya entry or skill. Models, runtime and timestamped backups remain on disk. Keep the original `--data-dir` to retain installation ownership records.
 
@@ -77,7 +78,7 @@ New Codex skills use `~/.agents/skills/laya`; an existing legacy skill under the
 
 Integration source: `src/laya_agent_kit`. The root `codex_bridge.py` remains a compatibility launcher for the earlier local installation. Model implementation stays in the upstream `laya` package. Re-run the root installer after source updates to refresh the installed package.
 
-The bundled upstream library is Laya 0.3.5 at commit `573e5b62696ba441230cd6be71d593331b5d23af` from `NandhaKishorM/laya`. Its source, license and credits are retained alongside this community integration.
+The bundled library is based on Laya 0.3.5 at commit `573e5b62696ba441230cd6be71d593331b5d23af` from `NandhaKishorM/laya`, with local runtime changes for backend precision and fallback reporting. Its license and credits are retained alongside this community integration. Use the root installer to include these runtime changes.
 
 Apache-2.0; preserve the upstream license and applicable notices when redistributing upstream code. Model weights and dependencies have their own applicable licenses. This kit downloads model weights separately and does not bundle them in its wheel.
 

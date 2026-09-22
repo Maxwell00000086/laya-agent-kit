@@ -25,6 +25,16 @@ Local machine receipts, excluded from version control:
 
 ## Limits and existing failures
 
+### Hardware/backend integration, 2026-09-22
+
+- Added explicit CPU, CUDA API, ROCm and MPS selection, actual backend/fallback reporting, hardware-aware bootstrap planning and a `hardware` diagnostic command. ROCm uses `torch.version.hip` for identification; precision selection no longer interprets an AMD device through NVIDIA compute-capability numbering.
+- 28 new regression tests passed: 12 backend/receipt cases, 11 provisioning cases and five PyTorch precision/fallback cases. Simulated AMD and Apple cases do not constitute hardware validation. The 49 existing installer, web setup, bridge and memory-lifecycle tests also passed, along with the upstream router and decision-model suites.
+- Built and installed both local wheels without replacing the existing PyTorch installation. `pip check`, Python compilation, the CI-selected Ruff checks, workflow YAML parsing and PowerShell syntax checks passed.
+- `tests/verify_backends.py --devices cpu cuda` used fresh MCP sessions running the installed package, with synthetic `choice`, `score` and `noul` questions. CPU first/repeated-call times were 27,175.5/729.3 ms; NVIDIA CUDA times were 24,507.7/69.4 ms. The first call includes runtime/model initialization, while the repeated call reuses the model. These are individual diagnostics under the current host workload, not performance guarantees or task-accuracy benchmarks.
+- Both sessions reported the actual backend and transitioned `inference_verified` from false to true. The separate `hardware --device rocm` check correctly failed on this NVIDIA-only PyTorch installation. Real-device receipt: `.cache/verification/backends.json` (ignored).
+- The complete `install.py --runtime-only --offline --models english --device auto` flow passed using the existing cache: hardware inventory, dependency/package installation, `pip check`, backend preflight, MCP discovery and real CUDA inference. It wrote no desktop registrations. Log: `.cache/verification/backend-bootstrap.log` (ignored). This is a cached local install check, not a fresh-machine download test.
+- AMD GPU/ROCm, Apple MPS and fresh-machine provisioning remain unverified on physical target machines. DirectML and ONNX are not implemented. Read [hardware setup](HARDWARE.md) before selecting a GPU backend; vendor detection alone is not proof of compatibility.
+
 ### Browser-assistance follow-up, 2026-09-22
 
 Repeated browser assistance exposed two separate problems: the host needed clearer proactive skill routing, and switching from `english` to `typed-decisions` could fail with Windows error 1455 (insufficient paging-file capacity). A fresh MCP session reproduced the latter. The single-model router constructed the replacement before evicting its previous checkpoint, temporarily requiring both allocations.

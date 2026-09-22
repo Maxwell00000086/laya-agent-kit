@@ -97,6 +97,21 @@ def _verify_compatibility(model: torch.nn.Module, cfg: Dict, weights: Dict[str, 
         )
 
 
+def _inference_dtype(device, configured_dtype):
+    if device.type in ("cpu", "mps"):
+        return torch.float32
+    if device.type == "cuda" and configured_dtype == torch.bfloat16 and not torch.cuda.is_bf16_supported():
+        return torch.float16
+    return configured_dtype
+
+
+def _accelerator_error(error):
+    return isinstance(error, NotImplementedError) or any(
+        token in str(error).lower()
+        for token in ("memory", "cuda", "hip", "rocm", "rocblas", "miopen", "mps", "not implemented", "not supported", "no kernel")
+    )
+
+
 class Agent:
     """System 1 decision model runtime: fast, non-autoregressive, calibrated decisions."""
 
@@ -163,12 +178,15 @@ class Agent:
             )
 
         # 1. Device resolution with automatic fallback
+        self.fallback_reason = None
         if device is not None:
             target_device = torch.device(device)
             if target_device.type == "cuda" and not torch.cuda.is_available():
+                self.fallback_reason = "Requested CUDA/HIP device is unavailable in this PyTorch installation."
                 print("Warning: CUDA requested but not available. Falling back to CPU.")
                 self.device = torch.device("cpu")
             elif target_device.type == "mps" and not (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()):
+                self.fallback_reason = "Requested MPS device is unavailable in this PyTorch installation."
                 print("Warning: MPS requested but not available. Falling back to CPU.")
                 self.device = torch.device("cpu")
             else:
@@ -218,12 +236,7 @@ class Agent:
                 "confidence; clamping %s. Treat confidence from the affected buckets as uncalibrated."
                 % (TEMP_MIN, TEMP_MAX, ", ".join(rejected)),
                 RuntimeWarning, stacklevel=2)
-        self.dtype = amp_dtype(self.cfg.get("amp_dtype", "fp16"))
-
-        if self.device.type == "cuda" and torch.cuda.get_device_capability(self.device)[0] < 8:
-            self.dtype = torch.float16
-        elif self.device.type in ("cpu", "mps"):
-            self.dtype = torch.float32
+        self.dtype = _inference_dtype(self.device, amp_dtype(self.cfg.get("amp_dtype", "fp16")))
 
         # 2. Place on device with graceful fallback to CPU on memory error
         fell_back_from = fell_back_why = None
@@ -234,6 +247,7 @@ class Agent:
                 # Record what actually went wrong: the reason matters more than the symptom,
                 # and it is the only place the underlying exception is ever surfaced.
                 fell_back_from, fell_back_why = self.device, e
+                self.fallback_reason = f"Model placement on {self.device} failed: {e}"
                 self.device = torch.device("cpu")
                 self.dtype = torch.float32
                 self.model.to(self.device).eval()
@@ -244,11 +258,9 @@ class Agent:
             print(
                 "\n[laya] Warning: could not place the model on %s, so it is running on CPU.\n"
                 "  Reason: %s\n"
-                "  Inference will be roughly 10-15x slower (~200-500 ms rather than ~35 ms).\n"
-                "  If this is a newer NVIDIA GPU (Blackwell / RTX 50-series), your PyTorch build\n"
-                "  may not support its CUDA architecture:\n"
-                "    pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu128\n"
-                "  See https://pytorch.org/get-started/locally/\n"
+                "  Check your GPU, driver and PyTorch build compatibility. CPU performance depends on your workload.\n"
+                "  NVIDIA: https://pytorch.org/get-started/locally/\n"
+                "  AMD: https://rocm.docs.amd.com/projects/radeon/en/latest/\n"
                 % (fell_back_from, fell_back_why), flush=True)
 
     @staticmethod
@@ -301,8 +313,9 @@ class Agent:
                     b["qtype"].to(self.device),
                 )
         except (RuntimeError, torch.cuda.OutOfMemoryError) as e:
-            if self.device.type != "cpu" and ("memory" in str(e).lower() or "cuda" in str(e).lower()):
-                print("Warning: GPU memory exceeded during inference. Falling back to CPU...")
+            if self.device.type != "cpu" and _accelerator_error(e):
+                self.fallback_reason = f"Inference on {self.device} failed: {e}"
+                print(f"Warning: {self.fallback_reason} Falling back to CPU...")
                 self.device = torch.device("cpu")
                 self.dtype = torch.float32
                 self.model.to(self.device)

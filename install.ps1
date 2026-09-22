@@ -2,6 +2,9 @@ param(
     [ValidateSet('codex', 'claude-code', 'cursor', 'generic')]
     [string[]]$Client = @('codex'),
     [string]$Python,
+    [ValidateSet('auto', 'cpu', 'cuda', 'rocm', 'mps')]
+    [string]$Device = 'auto',
+    [string]$TorchIndexUrl,
     [switch]$Offline,
     [switch]$DryRun,
     [switch]$Replace
@@ -26,6 +29,8 @@ if (-not $Python) {
     }
 }
 $installArguments = @('-X', 'utf8', (Join-Path $PSScriptRoot 'install.py'))
+$installArguments += @('--device', $Device)
+if ($TorchIndexUrl) { $installArguments += @('--torch-index-url', $TorchIndexUrl) }
 foreach ($clientName in $Client) {
     $installArguments += @('--client', $clientName)
 }

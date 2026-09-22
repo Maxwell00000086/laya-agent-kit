@@ -17,6 +17,7 @@ import warnings
 import zipfile
 
 from install import ROOT, environment_python
+from laya_agent_kit.backends import DEVICE_CHOICES
 
 
 TUNNEL_VERSION = "v0.0.14"
@@ -42,7 +43,7 @@ def make_parser():
     parser.add_argument("--data-dir", type=Path, default=ROOT / ".cache")
     parser.add_argument("--wheelhouse", type=Path)
     parser.add_argument("--torch-index-url")
-    parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
+    parser.add_argument("--device", choices=DEVICE_CHOICES, default="auto")
     parser.add_argument("--tunnel-id", help="Existing tunnel_<32 lowercase hex> associated with your ChatGPT workspace")
     parser.add_argument("--tunnel-client", type=Path, help="Use an explicitly selected official tunnel-client executable")
     parser.add_argument("--key-env", help="Explicitly read the runtime key from this environment variable instead of prompting locally")

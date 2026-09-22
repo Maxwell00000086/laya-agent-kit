@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 from pathlib import Path
 import struct
@@ -8,13 +9,30 @@ import venv
 
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT / "agent-kit/src"))
+
+from laya_agent_kit.backends import DEVICE_CHOICES
+from laya_agent_kit.provision import hardware_inventory, torch_install_plan
 
 
 def environment_python(directory):
     return directory / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 
 
-def main():
+def existing_torch(python):
+    if not python.is_file():
+        return None
+    script = (
+        "import importlib.util, json, sys; "
+        f"sys.path.insert(0, {str(ROOT / 'agent-kit/src')!r}); "
+        "from laya_agent_kit.backends import torch_capabilities; "
+        "print(json.dumps(torch_capabilities() if importlib.util.find_spec('torch') else None))"
+    )
+    result = subprocess.run([str(python), "-I", "-X", "utf8", "-c", script], capture_output=True, text=True, encoding="utf-8", timeout=45, check=True)
+    return json.loads(result.stdout)
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Create/reuse an isolated Laya environment and install AI integrations.",
         epilog="Client options are forwarded to laya-agent-kit install. Example: python install.py --client codex --client claude-code",
@@ -25,7 +43,9 @@ def main():
     parser.add_argument("--offline", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--runtime-only", action="store_true", help="Prepare models and verify MCP without registering desktop clients")
-    arguments, remaining = parser.parse_known_args()
+    parser.add_argument("--device", choices=DEVICE_CHOICES, default="auto")
+    arguments, remaining = parser.parse_known_args(argv)
+    remaining.extend(["--device", arguments.device])
     operation = "prepare" if arguments.runtime_only else "install"
     if sys.version_info < (3, 10) or struct.calcsize("P") != 8:
         parser.error("A 64-bit Python 3.10 or newer is required; Python 3.12 is recommended.")
@@ -46,6 +66,12 @@ def main():
         return
     if directory.exists() and not (directory / "pyvenv.cfg").is_file():
         parser.error(f"Refusing to reuse a directory without pyvenv.cfg: {directory}")
+    hardware = hardware_inventory()
+    try:
+        plan = torch_install_plan(arguments.device, arguments.torch_index_url, arguments.offline, hardware, existing_torch(python))
+    except ValueError as error:
+        parser.error(str(error))
+    print(json.dumps({"hardware": hardware, "torch_installation": plan}, ensure_ascii=False), flush=True)
     if not python.is_file():
         print(f"Creating isolated environment: {directory}", flush=True)
         venv.EnvBuilder(with_pip=True).create(directory)
@@ -55,18 +81,16 @@ def main():
         sources.append("--no-index")
     if arguments.wheelhouse:
         sources.extend(["--find-links", str(arguments.wheelhouse.expanduser().resolve())])
-    if arguments.torch_index_url:
-        if arguments.offline:
-            parser.error("--torch-index-url cannot be combined with --offline; provide CUDA wheels through --wheelhouse")
-        if not arguments.torch_index_url.startswith("https://download.pytorch.org/whl/"):
-            parser.error("Use an official https://download.pytorch.org/whl/ index")
-        subprocess.run([*pip, "--upgrade", "torch>=2.0,<3", "--index-url", arguments.torch_index_url], check=True)
+    if plan["index_url"]:
+        replacement = ["--force-reinstall"] if plan["replace_torch"] else []
+        subprocess.run([*pip, "--upgrade", *replacement, "torch>=2.0,<3", "--index-url", plan["index_url"]], check=True)
     if arguments.offline:
         subprocess.run([*pip, *sources, "setuptools>=68", "wheel"], check=True)
         sources.append("--no-build-isolation")
     print("Installing Laya and its agent integration package...", flush=True)
     subprocess.run([*pip, *sources, str(ROOT), str(ROOT / "agent-kit")], check=True)
     subprocess.run([str(python), "-I", "-m", "pip", "check"], check=True)
+    subprocess.run([str(python), "-I", "-X", "utf8", "-m", "laya_agent_kit", "hardware", "--device", arguments.device], check=True)
     subprocess.run([str(python), "-I", "-X", "utf8", "-m", "laya_agent_kit", operation, *remaining], check=True)
 
 

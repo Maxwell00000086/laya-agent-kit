@@ -80,7 +80,11 @@ python3 install.py --client codex --client claude-code
 .\.venv\Scripts\python.exe install.py --client codex --models english multilingual
 ```
 
-`--device auto` 自动选择 GPU/CPU；`--device cuda` 要求可用 CUDA，否则注册前报错。需要指定 PyTorch 官方 CUDA 轮子时可以添加 `--torch-index-url https://download.pytorch.org/whl/cu130`，需匹配显卡驱动；已有兼容 PyTorch 默认复用。
+`--device auto` 优先复用现有可用 CUDA/ROCm，其次 MPS，最后 CPU；推理结果显示实际后端和回退原因。支持显式选择 `cpu`、`cuda`、`rocm`、`mps`。显式要求 GPU 时，CPU 回退不能被当作验证成功。
+
+全新 Windows/Linux 环境检测不到 NVIDIA 时默认安装 CPU 轮子；A 卡可以先通过 CPU 使用。AMD GPU 加速要求按官方兼容矩阵配置 ROCm/PyTorch，再运行 `python install.py --client codex --device rocm`；安装器不会只凭 A 卡名称猜测 ROCm 版本。已有 Torch 默认保留，只有显式传入 `--torch-index-url` 才重装指定来源的 Torch。PowerShell 入口支持 `-Device` 和 `-TorchIndexUrl`。
+
+新增 `python -m laya_agent_kit hardware --device auto` 查看后端；`doctor --inference` 执行真实验证。当前 CPU、NVIDIA 有实机验证，AMD/MPS 需要相应机器验证；DirectML/ONNX 尚未实现。详见 [硬件支持与验证范围](agent-kit/HARDWARE.md)，不承诺所有 CPU 都能达到 20–60ms。
 
 完全离线安装使用 `--offline`，需要提前备好模型缓存和兼容 Python 依赖；新环境可通过 `--wheelhouse` 指定本地轮子目录。离线安装不会联网补齐缺失资源。
 
