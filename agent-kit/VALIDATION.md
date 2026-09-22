@@ -25,6 +25,20 @@ Local machine receipts, excluded from version control:
 
 ## Limits and existing failures
 
+### Browser-assistance follow-up, 2026-09-22
+
+Repeated browser assistance exposed two separate problems: the host needed clearer proactive skill routing, and switching from `english` to `typed-decisions` could fail with Windows error 1455 (insufficient paging-file capacity). A fresh MCP session reproduced the latter. The single-model router constructed the replacement before evicting its previous checkpoint, temporarily requiring both allocations.
+
+The serialized Agent Kit runtime now unloads its old checkpoint, collects references and releases unused CUDA cache before constructing a different checkpoint. It still reuses a warm matching model. Missing checkpoint files are checked before unloading, and a failed replacement can be followed by a fresh load of the previous model. This does not increase Windows paging-file settings or change upstream routing semantics.
+
+- Three new memory-lifecycle regression cases passed, after two failed against the previous implementation. They run in the Agent Kit CI job without downloading weights.
+- All seven bridge tests and 24 installer tests passed. Both installed and distributable skill definitions passed validation; automatic skill selection was already enabled and remains enabled.
+- A fresh real CUDA MCP session completed `english` then `typed-decisions`, followed by two calls reusing the typed checkpoint. Client-observed times were 18,478.5 ms for the first English call, 15,772.8 ms for the model switch and 27.1/31.8 ms for the subsequent short typed calls. These few observations are diagnostics, not general latency or task-accuracy benchmarks, and exclude the host AI's preparation and verification work.
+- Diagnostic receipt: `.cache/verification/laya-session-probe.json`. The reproduction helper and page-specific requests remain local ignored artifacts.
+- After reconnecting the actual Codex host, `laya_status` succeeded and `laya_judge` ran the `typed-decisions` checkpoint on CUDA. A synthetic duplicate-charge ticket was classified as `billing`; the first call took 18,050 ms including model loading. This verifies the host MCP connection and inference path, not general task accuracy.
+
+The skills now describe proactive passage ranking and bounded browser/frontend comparisons, batching, model reuse, independent verification and connection-failure handling. They are host instructions, not mandatory tool interception hooks. Incorrect browser suggestions remain possible; this change does not train the model or establish its accuracy. An already closed host MCP transport still needs reconnection to start the updated runtime.
+
 - An exploratory `unittest discover -p 'test_*.py'` is not a valid all-suite runner for upstream: several script tests call `sys.exit()` when imported, and `test_local_e2e.py` interprets positional arguments as its model directory. Use their documented script entrypoints and supply the expected model layout.
 - The unmodified upstream `tests/test_download.py` has Windows path-separator assertion failures: expected file names use `str(Path)` backslashes, while Hugging Face file selection returns forward slashes. Five comparisons failed. The test's actual inference comparisons passed before those assertions. This integration does not modify that upstream test or claim that every upstream test passes on Windows.
 - macOS/Linux provisioning and Apple hardware were not tested on physical machines. There is no MLX backend in this kit.
@@ -60,6 +74,7 @@ Run from the repository root on Windows:
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_agent_kit.py -v
 .\.venv\Scripts\python.exe -X utf8 -m unittest discover -s tests -p test_codex_bridge.py -v
+.\.venv\Scripts\python.exe -X utf8 tests\test_runtime_lifecycle.py
 .\.venv\Scripts\python.exe -X utf8 tests\verify_codex_mcp.py
 .\.venv\Scripts\python.exe -X utf8 tests\verify_agent_install.py
 .\.venv\Scripts\python.exe -X utf8 -m pip check

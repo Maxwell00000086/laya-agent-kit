@@ -1,5 +1,6 @@
 import argparse
 from contextlib import redirect_stdout
+import gc
 from importlib.metadata import version
 import json
 import math
@@ -172,6 +173,13 @@ class LocalRuntime:
             missing = missing_model_files(DATA_DIRECTORY)[decision["model"]]
             if missing:
                 raise ValueError(f"MODEL_NOT_INSTALLED: {decision['model']}. Run laya-agent-kit download for this model. Missing files: {', '.join(missing)}")
+            if router.loaded and decision["model"] not in router.loaded:
+                router.unload()
+                gc.collect()
+                import torch
+
+                if torch.cuda.is_initialized():
+                    torch.cuda.empty_cache()
             agent = router.load(decision["model"])
             budgets = check_budget(agent.tok, agent.cfg, request.state, questions)
             result = agent.predict(request.state, questions)

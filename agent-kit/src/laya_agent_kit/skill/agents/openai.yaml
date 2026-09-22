@@ -1,7 +1,7 @@
 interface:
   display_name: "Laya Local Decisions"
-  short_description: "Local SEO passage ranking and bounded frontend judgments"
-  default_prompt: "Use $laya to rank the supplied SEO passages or compare frontend options, then verify the evidence and summarize the findings."
+  short_description: "Proactive local passage ranking and browser/frontend choices"
+  default_prompt: "Use $laya to rank supplied passages or compare browser/frontend candidates, reuse the session, batch related questions, and verify the evidence."
 policy:
   allow_implicit_invocation: true
 dependencies:
